@@ -1,8 +1,11 @@
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import Toast from '../components/Toast';
 import TrustBadge from '../components/TrustBadge';
 import {
   bids,
   comments,
+  currentUserId,
   getCategoryById,
   getConditionById,
   getListingById,
@@ -12,8 +15,30 @@ import {
 } from '../data/mockData';
 
 function ListingDetailPage() {
+  const navigate = useNavigate();
   const { listingId } = useParams();
   const listing = listingId ? getListingById(listingId) : undefined;
+  const [toast, setToast] = useState('');
+  const [liked, setLiked] = useState(false);
+  const [showBidForm, setShowBidForm] = useState(false);
+  const [bidAmount, setBidAmount] = useState('');
+  const [newComment, setNewComment] = useState('');
+  const [listingComments, setListingComments] = useState(
+    comments.filter((comment) => comment.target_type === 'listing' && comment.target_id === listingId),
+  );
+  const [listingLikesCount, setListingLikesCount] = useState(
+    reactions.filter((reaction) => reaction.target_type === 'listing' && reaction.target_id === listingId).length,
+  );
+  const [listingBids, setListingBids] = useState(bids.filter((bid) => bid.listing_id === listingId));
+  const highestBid = listingBids.reduce((highest, bid) => Math.max(highest, bid.amount), listing?.price ?? 0);
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+    const timer = window.setTimeout(() => setToast(''), 1800);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   if (!listing) {
     return <p>Listing not found.</p>;
@@ -21,13 +46,61 @@ function ListingDetailPage() {
 
   const seller = getUserById(listing.seller_id);
   const profile = getProfileByUserId(listing.seller_id);
-  const listingComments = comments.filter((comment) => comment.target_type === 'listing' && comment.target_id === listing.listing_id);
-  const listingLikes = reactions.filter((reaction) => reaction.target_type === 'listing' && reaction.target_id === listing.listing_id);
-  const listingBids = bids.filter((bid) => bid.listing_id === listing.listing_id);
+
+  const handleLike = () => {
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setListingLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+    if (nextLiked) {
+      setToast('Liked listing');
+    }
+  };
+
+  const handleAddComment = () => {
+    if (!newComment.trim()) {
+      return;
+    }
+    setListingComments((prev) => [
+      {
+        comment_id: `local-${Date.now()}`,
+        user_id: currentUserId,
+        target_type: 'listing',
+        target_id: listing.listing_id,
+        content: newComment.trim(),
+        created_at: new Date().toISOString().slice(0, 10),
+      },
+      ...prev,
+    ]);
+    setNewComment('');
+    setToast('Comment added');
+  };
+
+  const handleBidSubmit = () => {
+    const parsedBid = Number(bidAmount);
+    if (!parsedBid || parsedBid <= highestBid) {
+      setToast('Bid must be higher than current highest bid');
+      return;
+    }
+    setListingBids((prev) => [
+      ...prev,
+      {
+        bid_id: `local-bid-${Date.now()}`,
+        listing_id: listing.listing_id,
+        bidder_id: currentUserId,
+        amount: parsedBid,
+        created_at: new Date().toISOString().slice(0, 10),
+        status: 'winning',
+      },
+    ]);
+    setBidAmount('');
+    setShowBidForm(false);
+    setToast('Bid placed');
+  };
 
   return (
     <section className="detail-layout">
       <article className="card detail-main">
+        <Toast message={toast} />
         <img src={listing.image_urls[0]} alt={listing.title} className="detail-image" />
         <h1>{listing.title}</h1>
         <p className="price">${listing.price.toFixed(2)}</p>
@@ -43,17 +116,63 @@ function ListingDetailPage() {
         <p className="muted">Course Codes: {listing.course_codes.join(', ') || 'N/A'}</p>
         <p className="muted">Tags: {listing.tags.join(', ')}</p>
         <div className="detail-actions">
-          <button type="button" className="button button-primary">
+          <button type="button" className="button button-primary" onClick={() => navigate('/messages')}>
             Message Seller
           </button>
+          <button type="button" className="button button-secondary" onClick={handleLike}>
+            {liked ? 'Unlike' : 'Like'} ({listingLikesCount})
+          </button>
           {listing.listing_type === 'auction' && (
-            <button type="button" className="button button-secondary">
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => setShowBidForm((prev) => !prev)}
+            >
               Place Bid
             </button>
           )}
           <button type="button" className="button button-danger">
             Report Listing
           </button>
+        </div>
+        {showBidForm && (
+          <div className="inline-panel">
+            <h4>Place a bid</h4>
+            <p className="muted">Current highest bid: ${highestBid.toFixed(2)}</p>
+            <div className="comment-input-row">
+              <input
+                type="number"
+                min={highestBid + 1}
+                value={bidAmount}
+                onChange={(event) => setBidAmount(event.target.value)}
+                placeholder="Enter your bid amount"
+              />
+              <button type="button" className="button button-primary" onClick={handleBidSubmit}>
+                Submit Bid
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="inline-panel">
+          <h3>Comments</h3>
+          <div className="comment-input-row">
+            <input
+              value={newComment}
+              onChange={(event) => setNewComment(event.target.value)}
+              placeholder="Ask a question or leave a note..."
+            />
+            <button type="button" className="button button-primary" onClick={handleAddComment}>
+              Add comment
+            </button>
+          </div>
+          <div className="comment-list">
+            {listingComments.map((comment) => (
+              <article key={comment.comment_id} className="comment-item">
+                <p>{comment.content}</p>
+                <p className="muted">{comment.created_at}</p>
+              </article>
+            ))}
+          </div>
         </div>
       </article>
 
@@ -68,9 +187,10 @@ function ListingDetailPage() {
         </div>
         <div className="card">
           <h3>Activity</h3>
-          <p>{listingLikes.length} likes</p>
+          <p>{listingLikesCount} likes</p>
           <p>{listingComments.length} comments</p>
           <p>{listingBids.length} bids</p>
+          <p>Highest bid: ${highestBid.toFixed(2)}</p>
         </div>
         <div className="card">
           <h3>Comments</h3>

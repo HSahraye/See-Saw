@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Toast from '../components/Toast';
 import { currentUserId, getProfileByUserId, getUserById } from '../data/mockData';
 
 function SettingsPage() {
@@ -7,7 +8,21 @@ function SettingsPage() {
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [major, setMajor] = useState(profile?.major ?? '');
   const [year, setYear] = useState(profile?.year ?? '');
+  const [privacyCampusProfile, setPrivacyCampusProfile] = useState(true);
+  const [privacyVerifiedOnly, setPrivacyVerifiedOnly] = useState(true);
+  const [notifyBid, setNotifyBid] = useState(true);
+  const [notifyMessage, setNotifyMessage] = useState(true);
+  const [notifyAdmin, setNotifyAdmin] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+    const timer = window.setTimeout(() => setToast(''), 1800);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   if (!user || !profile) {
     return <p>Settings unavailable.</p>;
@@ -19,11 +34,13 @@ function SettingsPage() {
         <h1>Settings & Edit Profile</h1>
         <p>Profile edits, privacy controls, and notifications preferences.</p>
       </div>
+      <Toast message={toast} />
       <form
         className="card form-grid"
         onSubmit={(event) => {
           event.preventDefault();
           setSaved(true);
+          setToast('Profile saved');
         }}
       >
         <label>
@@ -45,26 +62,46 @@ function SettingsPage() {
         <fieldset>
           <legend>Privacy Settings</legend>
           <label>
-            <input type="checkbox" defaultChecked />
+            <input
+              type="checkbox"
+              checked={privacyCampusProfile}
+              onChange={(event) => setPrivacyCampusProfile(event.target.checked)}
+            />
             Show campus profile publicly within SFSU tenant
           </label>
           <label>
-            <input type="checkbox" defaultChecked />
+            <input
+              type="checkbox"
+              checked={privacyVerifiedOnly}
+              onChange={(event) => setPrivacyVerifiedOnly(event.target.checked)}
+            />
             Allow messages only from verified students
           </label>
         </fieldset>
         <fieldset>
           <legend>Notification Settings</legend>
           <label>
-            <input type="checkbox" defaultChecked />
+            <input
+              type="checkbox"
+              checked={notifyBid}
+              onChange={(event) => setNotifyBid(event.target.checked)}
+            />
             Bid updates
           </label>
           <label>
-            <input type="checkbox" defaultChecked />
+            <input
+              type="checkbox"
+              checked={notifyMessage}
+              onChange={(event) => setNotifyMessage(event.target.checked)}
+            />
             New messages
           </label>
           <label>
-            <input type="checkbox" defaultChecked />
+            <input
+              type="checkbox"
+              checked={notifyAdmin}
+              onChange={(event) => setNotifyAdmin(event.target.checked)}
+            />
             Admin actions
           </label>
         </fieldset>
@@ -75,7 +112,7 @@ function SettingsPage() {
         </article>
         {saved && <p className="success-text">Profile settings saved in demo state.</p>}
         <button type="submit" className="button button-primary">
-          Save Settings
+          Save Profile
         </button>
       </form>
     </section>

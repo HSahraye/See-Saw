@@ -14,14 +14,20 @@ function ListingCard({ listing }: ListingCardProps) {
   const condition = getConditionById(listing.condition_id);
 
   return (
-    <article className="card listing-card">
-      <img src={listing.image_urls[0]} alt={listing.title} className="listing-image" />
+    <article className="card listing-card clickable-card">
+      <Link to={`/listing/${listing.listing_id}`}>
+        <img src={listing.image_urls[0]} alt={listing.title} className="listing-image" />
+      </Link>
       <div className="listing-content">
         <div className="listing-header">
           <TrustBadge label={listing.listing_type === 'auction' ? 'Auction' : 'Fixed Price'} variant="warning" />
           {listing.campus_pickup && <TrustBadge label="Campus Pickup" variant="success" />}
         </div>
-        <h3>{listing.title}</h3>
+        <h3>
+          <Link to={`/listing/${listing.listing_id}`} className="listing-title-link">
+            {listing.title}
+          </Link>
+        </h3>
         <p className="listing-meta">
           {category?.name} · {condition?.label}
         </p>
@@ -30,7 +36,9 @@ function ListingCard({ listing }: ListingCardProps) {
           Sold by <Link to={`/profile/${listing.seller_id}`}>{seller?.full_name}</Link> · {sellerProfile?.major}
         </p>
         <div className="listing-actions">
-          <TrustBadge label="Verified SFSU Student" variant="default" />
+          <Link to={`/profile/${listing.seller_id}`} className="badge-link">
+            <TrustBadge label="Verified SFSU Student" variant="default" />
+          </Link>
           <Link to={`/listing/${listing.listing_id}`} className="button button-primary">
             View Listing
           </Link>
