@@ -1,5 +1,7 @@
 import type { Listing } from '../types/models';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5001';
+
 interface FlaskListing {
   listing_id: string;
   title: string;
@@ -53,7 +55,7 @@ function mapFlaskListingToFrontend(listing: FlaskListing): Listing {
 }
 
 export async function getListings(): Promise<Listing[]> {
-  const response = await fetch('http://127.0.0.1:5001/api/listings');
+  const response = await fetch(`${API_BASE_URL}/api/listings`);
   if (!response.ok) {
     throw new Error(`Unable to load listings: ${response.status}`);
   }
@@ -62,7 +64,7 @@ export async function getListings(): Promise<Listing[]> {
 }
 
 export async function getListingById(listingId: string): Promise<Listing> {
-  const response = await fetch(`http://127.0.0.1:5001/api/listings/${listingId}`);
+  const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}`);
   if (!response.ok) {
     throw new Error(`Unable to load listing ${listingId}: ${response.status}`);
   }

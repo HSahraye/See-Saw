@@ -27,7 +27,7 @@ function BrowsePage() {
       } catch {
         if (isMounted) {
           setError(
-            'Unable to load listings from Flask API. Make sure Flask is running on http://127.0.0.1:5001.',
+            'Unable to load listings from Flask API. Make sure the backend service is running.',
           );
         }
       } finally {

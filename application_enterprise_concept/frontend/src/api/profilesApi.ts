@@ -1,3 +1,5 @@
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:5001';
+
 export interface FlaskProfile {
   user_id: string;
   name: string;
@@ -19,7 +21,7 @@ export interface FlaskProfile {
 }
 
 export async function getProfileById(userId: string): Promise<FlaskProfile> {
-  const response = await fetch(`http://127.0.0.1:5001/api/profiles/${userId}`);
+  const response = await fetch(`${API_BASE_URL}/api/profiles/${userId}`);
   if (!response.ok) {
     throw new Error(`Unable to load profile ${userId}: ${response.status}`);
   }
