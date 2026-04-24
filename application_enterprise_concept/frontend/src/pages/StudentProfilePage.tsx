@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { getProfileById, type FlaskProfile } from '../api/profilesApi';
 import ListingCard from '../components/ListingCard';
 import PostCard from '../components/PostCard';
 import ProfileCard from '../components/ProfileCard';
@@ -19,6 +20,7 @@ import {
   reviews,
   trustScores,
 } from '../data/mockData';
+import type { Profile, TrustScore, User } from '../types/models';
 
 const tabs = ['posts', 'listings', 'reviews', 'comments', 'about'] as const;
 
@@ -26,16 +28,21 @@ function StudentProfilePage() {
   const { userId = 'u1' } = useParams();
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>('posts');
   const [toast, setToast] = useState('');
+  const [apiProfile, setApiProfile] = useState<FlaskProfile | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [profileError, setProfileError] = useState('');
 
-  const user = getUserById(userId);
-  const profile = getProfileByUserId(userId);
-  const trustScore = trustScores.find((score) => score.user_id === userId);
+  const fallbackUser = getUserById(userId);
+  const fallbackProfile = getProfileByUserId(userId);
+  const fallbackTrustScore = trustScores.find((score) => score.user_id === userId);
 
   const userListings = useMemo(() => listings.filter((listing) => listing.seller_id === userId), [userId]);
   const userPosts = useMemo(() => posts.filter((post) => post.user_id === userId), [userId]);
   const userReviews = useMemo(() => reviews.filter((review) => review.reviewee_id === userId), [userId]);
   const userComments = useMemo(() => comments.filter((comment) => comment.user_id === userId), [userId]);
-  const badgeLabels = profileBadges.filter((badge) => badge.user_id === userId).map((badge) => badge.label);
+  const badgeLabelsFromMock = profileBadges
+    .filter((badge) => badge.user_id === userId)
+    .map((badge) => badge.label);
   const activeListingsCount = userListings.filter((listing) => listing.status === 'active').length;
   const soldListingsCount = userListings.filter((listing) => listing.status === 'sold').length;
 
@@ -47,14 +54,98 @@ function StudentProfilePage() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  if (!user || !profile) {
-    return <p>Profile unavailable.</p>;
+  useEffect(() => {
+    let isMounted = true;
+    const loadProfile = async () => {
+      try {
+        setIsLoadingProfile(true);
+        setProfileError('');
+        const profile = await getProfileById(userId);
+        if (isMounted) {
+          setApiProfile(profile);
+        }
+      } catch {
+        if (isMounted) {
+          setApiProfile(null);
+          setProfileError(
+            'Flask profile API unavailable. Showing local demo profile data when possible.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingProfile(false);
+        }
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
+
+  const user: User | undefined = apiProfile
+    ? {
+        user_id: apiProfile.user_id,
+        email: apiProfile.email,
+        full_name: apiProfile.name,
+        role: 'student',
+        is_active: true,
+        created_at: apiProfile.joined_at,
+      }
+    : fallbackUser;
+
+  const profile: Profile | undefined = apiProfile
+    ? {
+        profile_id: `api-profile-${apiProfile.user_id}`,
+        user_id: apiProfile.user_id,
+        avatar_url: apiProfile.avatar_url,
+        cover_url: apiProfile.cover_url,
+        major: apiProfile.major,
+        year: apiProfile.year,
+        bio: apiProfile.bio,
+        campus: 'SFSU Main Campus',
+        response_rate: apiProfile.response_rate,
+        joined_date: apiProfile.joined_at,
+      }
+    : fallbackProfile;
+
+  const trustScore: TrustScore | undefined = apiProfile
+    ? {
+        trust_score_id: `api-trust-${apiProfile.user_id}`,
+        user_id: apiProfile.user_id,
+        rating_average: apiProfile.rating,
+        completed_sales: apiProfile.total_sales,
+        response_rate: apiProfile.response_rate,
+        report_count: 0,
+        verification_level: apiProfile.is_verified ? 'verified' : 'basic',
+        score: apiProfile.trust_score,
+      }
+    : fallbackTrustScore;
+
+  const badgeLabels = apiProfile?.badges?.length ? apiProfile.badges : badgeLabelsFromMock;
+
+  if (isLoadingProfile) {
+    return <article className="card">Loading profile from Flask...</article>;
   }
+
+  if (!user || !profile) {
+    return <article className="card error-box">Profile unavailable.</article>;
+  }
+
+  const meetupSpotsDisplay = apiProfile?.preferred_meetup_spots?.length
+    ? apiProfile.preferred_meetup_spots
+    : meetupSpots.map((spot) => spot.name);
+  const coursesDisplay = apiProfile?.courses?.length
+    ? apiProfile.courses
+    : courses.map((course) => course.code);
 
   return (
     <section>
       <ProfileCard profile={profile} user={user} trustScore={trustScore} badgeLabels={badgeLabels} />
       <Toast message={toast} />
+      {profileError && <article className="error-box">{profileError}</article>}
       <div className="tabs">
         {tabs.map((tab) => (
           <button
@@ -140,9 +231,12 @@ function StudentProfilePage() {
           <p>Major: {profile.major}</p>
           <p>Year: {profile.year}</p>
           <p>Campus: {profile.campus}</p>
-          <p>Preferred Meetup: {meetupSpots.map((spot) => spot.name).join(', ')}</p>
-          <p>Verification Status: Verified with {user.email}</p>
-          <p>Courses: {courses.map((course) => course.code).join(', ')}</p>
+          <p>Preferred Meetup: {meetupSpotsDisplay.join(', ')}</p>
+          <p>
+            Verification Status: {apiProfile?.is_verified === false ? 'Pending verification' : 'Verified'} with{' '}
+            {user.email}
+          </p>
+          <p>Courses: {coursesDisplay.join(', ')}</p>
           <p>Response Rate: {profile.response_rate}%</p>
           <p>Trust Tier: {trustScore?.verification_level ?? 'silver'}</p>
         </article>

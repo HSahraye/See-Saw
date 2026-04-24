@@ -1,12 +1,48 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { getListings } from '../api/listingsApi';
 import ListingCard from '../components/ListingCard';
-import { categories, conditions, courses, listings } from '../data/mockData';
+import { categories, conditions, courses } from '../data/mockData';
+import type { Listing } from '../types/models';
 
 function BrowsePage() {
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedCourse, setSelectedCourse] = useState('all');
   const [selectedCondition, setSelectedCondition] = useState('all');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadListings = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await getListings();
+        if (isMounted) {
+          setListings(data);
+        }
+      } catch {
+        if (isMounted) {
+          setError(
+            'Unable to load listings from Flask API. Make sure Flask is running on http://127.0.0.1:5001.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadListings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredListings = useMemo(() => {
     return listings.filter((listing) => {
@@ -21,7 +57,7 @@ function BrowsePage() {
 
       return matchesSearch && matchesCategory && matchesCourse && matchesCondition;
     });
-  }, [searchTerm, selectedCategory, selectedCourse, selectedCondition]);
+  }, [listings, searchTerm, selectedCategory, selectedCourse, selectedCondition]);
 
   return (
     <section>
@@ -62,6 +98,8 @@ function BrowsePage() {
           ))}
         </select>
       </div>
+      {loading && <article className="card">Loading listings from Flask...</article>}
+      {error && !loading && <article className="card error-box">{error}</article>}
       <div className="listing-grid">
         {filteredListings.map((listing) => (
           <ListingCard key={listing.listing_id} listing={listing} />

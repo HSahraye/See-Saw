@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { getListingById as getListingByIdFromApi } from '../api/listingsApi';
 import Toast from '../components/Toast';
 import TrustBadge from '../components/TrustBadge';
 import {
@@ -8,16 +9,19 @@ import {
   currentUserId,
   getCategoryById,
   getConditionById,
-  getListingById,
+  getListingById as getListingByIdFromMock,
   getProfileByUserId,
   getUserById,
   reactions,
 } from '../data/mockData';
+import type { Listing } from '../types/models';
 
 function ListingDetailPage() {
   const navigate = useNavigate();
   const { listingId } = useParams();
-  const listing = listingId ? getListingById(listingId) : undefined;
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [isLoadingListing, setIsLoadingListing] = useState(false);
+  const [listingError, setListingError] = useState('');
   const [toast, setToast] = useState('');
   const [liked, setLiked] = useState(false);
   const [showBidForm, setShowBidForm] = useState(false);
@@ -33,6 +37,44 @@ function ListingDetailPage() {
   const highestBid = listingBids.reduce((highest, bid) => Math.max(highest, bid.amount), listing?.price ?? 0);
 
   useEffect(() => {
+    if (!listingId) {
+      return;
+    }
+    let isMounted = true;
+    const loadListing = async () => {
+      try {
+        setIsLoadingListing(true);
+        setListingError('');
+        const apiListing = await getListingByIdFromApi(listingId);
+        if (isMounted) {
+          setListing(apiListing);
+        }
+      } catch {
+        const fallbackListing = getListingByIdFromMock(listingId);
+        if (isMounted) {
+          if (fallbackListing) {
+            setListing(fallbackListing);
+            setListingError('Flask API unavailable. Showing local demo listing data.');
+          } else {
+            setListing(null);
+            setListingError('Listing not found.');
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingListing(false);
+        }
+      }
+    };
+
+    loadListing();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [listingId]);
+
+  useEffect(() => {
     if (!toast) {
       return;
     }
@@ -40,8 +82,16 @@ function ListingDetailPage() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  if (!listingId) {
+    return <article className="card error-box">Listing not found.</article>;
+  }
+
+  if (isLoadingListing) {
+    return <article className="card">Loading listing details from Flask...</article>;
+  }
+
   if (!listing) {
-    return <p>Listing not found.</p>;
+    return <article className="card error-box">{listingError || 'Listing not found.'}</article>;
   }
 
   const seller = getUserById(listing.seller_id);
@@ -101,6 +151,7 @@ function ListingDetailPage() {
     <section className="detail-layout">
       <article className="card detail-main">
         <Toast message={toast} />
+        {listingError && <article className="error-box">{listingError}</article>}
         <img src={listing.image_urls[0]} alt={listing.title} className="detail-image" />
         <h1>{listing.title}</h1>
         <p className="price">${listing.price.toFixed(2)}</p>
