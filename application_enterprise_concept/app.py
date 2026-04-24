@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 
@@ -360,4 +362,6 @@ def favicon():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    # Render (and similar PaaS) injects PORT at runtime.
+    port = int(os.getenv("PORT", "5001"))
+    app.run(host="0.0.0.0", port=port, debug=False)
